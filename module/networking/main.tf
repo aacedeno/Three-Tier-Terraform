@@ -162,8 +162,8 @@ resource "aws_security_group" "ext_prod_lb_sg" {
 }
 
 
-resource "aws_security_group" "prod_web_sg" {
-  name        = "prod_web_sg"
+resource "aws_security_group" "web_servers_sg" {
+  name        = "web_servers_sg"
   description = "Allow SSH inbound traffic from jumpbox and HTTP inbound traffic from external ALB"
   vpc_id      = aws_vpc.prod_vpc.id
 
@@ -181,37 +181,37 @@ resource "aws_security_group" "prod_web_sg" {
   }
 }
 
-#How to distriute traffic from web tier to internal alb -----------
-resource "aws_security_group" "int_prod_lb_sg" {
-  name        = "int_prod_lb_sg"
-  description = "Allow Inbound HTTP Traffic from the web tier"
+# #How to distriute traffic from web tier to internal alb -----------
+# resource "aws_security_group" "int_prod_lb_sg" {
+#   name        = "int_prod_lb_sg"
+#   description = "Allow Inbound HTTP Traffic from the web tier"
+#   vpc_id      = aws_vpc.prod_vpc.id
+
+#   ingress {
+#     from_port       = 80
+#     to_port         = 80
+#     protocol        = "tcp"
+#     security_groups = [aws_security_group.web_servers_sg.id]
+#   }
+
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+# }
+
+resource "aws_security_group" "app_servers_sg" {
+  name        = "app_server_sg"
   vpc_id      = aws_vpc.prod_vpc.id
+  description = "Allow Inbound HTTP from the web servers and SSH inbound traffic from Bastion"
 
   ingress {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.prod_web_sg.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_security_group" "prod_app_sg" {
-  name        = "prod_app_sg"
-  vpc_id      = aws_vpc.prod_vpc.id
-  description = "Allow Inbound HTTP from the internal ALB and SSH inbound traffic from Bastion"
-
-  ingress {
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.int_prod_lb_sg.id]
+    security_groups = [aws_security_group.web_servers_sg.id]
   }
 
   ingress {
@@ -231,14 +231,14 @@ resource "aws_security_group" "prod_app_sg" {
 
 resource "aws_security_group" "prod_rds_sg" {
   name        = "prod_rds_sg"
-  description = "Allow MySQL Port Inbound Traffic from Backend App Security Group"
+  description = "Allow MySQL port inbound traffic from backend app servers"
   vpc_id      = aws_vpc.prod_vpc.id
 
   ingress {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.prod_app_sg.id]
+    security_groups = [aws_security_group.app_servers_sg.id]
   }
 
   egress {

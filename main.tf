@@ -27,15 +27,60 @@ module "database" {
   db_name                = var.db_name
   dbuser                 = var.dbuser
   dbpassword             = var.dbpassword
-  db_identifier          = "aac-db"
+  db_identifier          = "prod-db"
   skip_db_snapshot       = true                                          #In prod it should most liekly be set to false
   db_subnet_group_name   = module.networking.aws_db_subnet_group_name[0] #Use count index to specify 1 private subent for db instance
   vpc_security_group_ids = module.networking.db_security_group
 }
 
-module "loadbalancing" {
-  source = "./module/loadbalancing"
-  #   extlb_prod_sg = ""
-  #   public_subnets = ""
+module "public-alb" {
+  source                     = "./module/loadbalancing"
+  extlb_prod_sg              = module.networking.extlb_prod_sg
+  public_subnets             = module.networking.public_subnets
+  web_tg_port                = 80
+  web_tg_protocol            = "HTTP"
+  vpc_id                     = module.networking.vpc_id
+  web_lb_healthy_threshold   = 2
+  web_lb_unhealthy_threshold = 2
+  web_lb_timeout             = 3
+  web_lb_interval            = 30
+  ext_listener_port          = 80
+  ext_listener_protocol      = "HTTP"
+}
+
+module "compute" {
+  source            = "./module/compute"
+  instance_type_web = "t2.micro"
+  instance_type_app = "t3.micro"
+  public_subnets    = module.networking.public_subnets
+  web_server_sg     = module.networking.web_server_sg
+  web_min_size      = 2
+  web_max_size      = 5
+  web_desired       = 2
+  private_subnets   = module.networking.private_subnets
+  app_server_sg     = module.networking.app_server_sg
+  app_min_size      = 2
+  app_max_size      = 4
+  app_desired       = 2
+  bastion_sg        = module.networking.bastion_sg
+  ext_alb_tg        = module.public-alb.ext_alb_tg
+  key_name          = "prodkey"
+  public_key_path   = var.public_key_path
+
+
 
 }
+# module "private-alb" {
+#   source = "./module/loadbalancing"
+#   intlb_prod_sg = module.networking.intlb_prod_sg
+#   private_subnets = module.networking.private_subnets
+#   app_tg_port                = 80
+#   app_tg_protocol            = "HTTP"
+#   vpc_id                     = module.networking.vpc_id
+#   app_lb_healthy_threshold   = 2
+#   app_lb_unhealthy_threshold = 2
+#   app_lb_timeout             = 3
+#   app_lb_interval            = 30
+#   int_listener_port          = 80
+#   int_listener_protocol      = "HTTP"
+# }
